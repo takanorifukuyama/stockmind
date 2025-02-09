@@ -14,3 +14,5 @@ tracing = "0.1.40"
 ngrok = { version = "0.13", features = ["axum"] }
 anyhow = "1"
 dotenvy = "0.15"
+reqwest = { version = "0.12", features = ["json"] }
+serde_json = "1.0"
