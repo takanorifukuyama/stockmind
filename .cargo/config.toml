@@ -1,2 +1,5 @@
 [net]
 git-fetch-with-cli = true
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-target", "-C", "link-arg=aarch64-apple-macos15.2"]

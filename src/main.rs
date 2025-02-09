@@ -17,6 +17,20 @@ struct LLMClient {
     api_token: String,
 }
 
+// モデル指定用の構造体
+#[derive(Clone)]
+pub struct LLMOptions<'a> {
+    pub model: &'a str,
+}
+
+impl<'a> Default for LLMOptions<'a> {
+    fn default() -> Self {
+        Self {
+            model: "google_ai:gemini-2.0-flash-exp",
+        }
+    }
+}
+
 impl LLMClient {
     fn new(api_url: String, operator_id: String, api_token: String) -> Self {
         Self {
@@ -26,16 +40,19 @@ impl LLMClient {
         }
     }
 
-    async fn get_response(&self, user_message: &str) -> Result<String, Box<dyn std::error::Error>> {
+    async fn get_response(
+        &self,
+        user_message: &str,
+        options: Option<LLMOptions<'_>>,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         let client = reqwest::Client::new();
+        let model = options
+            .map(|opt| opt.model)
+            .unwrap_or("google_ai:gemini-2.0-flash-exp");
         
         let request_body = json!({
-            "model": "google_ai:gemini-2.0-flash-exp",
+            "model": model,
             "messages": [
-                {
-                    "role": "developer",
-                    "content": "You are a helpful assistant that responds in Japanese."
-                },
                 {
                     "role": "user",
                     "content": user_message
@@ -87,18 +104,41 @@ impl SlackEventHandler for MentionHandler {
                 channel, ts, text, ..
             } => {
                 info!(
-                    "メンションを受信: channel={}, ts={}, text={}",
+                    "メンションを受信: chanel={}, ts={}, text={}",
                     channel, ts, text
                 );
 
-                // LLM APIから応答を取得
-                let response = self.llm_client.get_response(&text).await?;
+                // クローンを作成して非同期タスクで処理
+                let llm_client = self.llm_client.clone();
+                let client = client.clone();
+                let channel = channel.clone();
+                let ts = ts.clone();
+                let text = text.clone();
 
-                // Slackに返信
-                client
-                    .reply_to_thread(&channel, &ts, &response)
-                    .await?;
-            }
+                tokio::spawn(async move {
+                    
+                    // モデルを指定してLLM APIから応答を取得
+                    let options = Some(LLMOptions {
+                        model: "google_ai:gemini-2.0-flash-exp",
+                    });
+
+                    let result = llm_client.get_response(&text, options).await;
+                    let message = match result {
+                        Ok(response) => response,
+                        Err(e) => {
+                            info!("LLM APIからの応答取得に失敗: {}", e);
+                            "申し訳ありません。応答の生成に失敗しました。".to_string()
+                        }
+                    };
+                    
+                    if let Err(e) = client.reply_to_thread(&channel, &ts, &message).await {
+                        info!("返信の送信に失敗: {}", e);
+                    }
+                });
+            },
+            Event::Message { channel, text, team_id } => {
+                info!("メッセージを受信: channel={}, text={}, team_id={}", channel, text, team_id.unwrap_or_default());
+            },
             _ => info!("未対応のイベント: {:?}", event),
         }
         Ok(())
