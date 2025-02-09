@@ -1,0 +1,16 @@
+[package]
+name = "stockmind"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+slack_rs = { git = "https://github.com/quantum-box/slack_rs.git", branch = "main" }
+
+tokio = { version = "1.35.0", features = ["rt-multi-thread", "macros"] }
+axum = { version = "0.6", features = ["http1", "macros"] }
+tracing-subscriber = "0.3"
+async-trait = "0.1"
+tracing = "0.1.40"
+ngrok = { version = "0.13", features = ["axum"] }
+anyhow = "1"
+dotenvy = "0.15"
