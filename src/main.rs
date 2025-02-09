@@ -3,8 +3,8 @@ use ngrok::prelude::*;
 use reqwest;
 use serde_json::{Value, json};
 use slack_rs::{
-    Event, MessageClient, SigningSecret, SlackEventHandler, Token, create_app_with_path,
-    events::Message, events::Sender,
+    Block, Event, MessageClient, SigningSecret, SlackEventHandler, Token, create_app_with_path,
+    events::{Message, Sender},
 };
 use std::net::SocketAddr;
 use tracing::{Level, info};
@@ -131,7 +131,12 @@ impl SlackEventHandler for MentionHandler {
                         }
                     };
 
-                    if let Err(e) = client.reply_to_thread(&channel, &ts, &message).await {
+                    if let Err(e) = client
+                        .reply_to_thread_with_blocks(&channel, &ts, vec![Block::Section {
+                            text: message,
+                        }])
+                        .await
+                    {
                         info!("返信の送信に失敗: {}", e);
                     }
                 });
@@ -175,7 +180,12 @@ impl SlackEventHandler for MentionHandler {
                                 }
                             };
 
-                            if let Err(e) = client.reply_to_thread(&channel, &ts, &message).await {
+                            if let Err(e) = client
+                                .reply_to_thread_with_blocks(&channel, &ts, vec![Block::Section {
+                                    text: message,
+                                }])
+                                .await
+                            {
                                 info!("返信の送信に失敗: {}", e);
                             }
                         });
