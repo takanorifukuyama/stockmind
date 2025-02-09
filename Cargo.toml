@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-slack_rs = { git = "https://github.com/quantum-box/slack_rs.git", branch = "main" }
+slack_rs = { git = "https://github.com/quantum-box/slack_rs.git", branch = "feature/message-event" }
 
 tokio = { version = "1.35.0", features = ["rt-multi-thread", "macros"] }
 axum = { version = "0.6", features = ["http1", "macros"] }

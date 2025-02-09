@@ -1,13 +1,14 @@
-use axum::{routing::get, Router};
+use axum::{Router, routing::get};
 use ngrok::prelude::*;
+use reqwest;
+use serde_json::{Value, json};
 use slack_rs::{
-    create_app_with_path, Event, MessageClient, SigningSecret, SlackEventHandler, Token,
+    Event, MessageClient, SigningSecret, SlackEventHandler, Token, create_app_with_path,
+    events::Message, events::Sender,
 };
 use std::net::SocketAddr;
-use tracing::{info, Level};
+use tracing::{Level, info};
 use tracing_subscriber::FmtSubscriber;
-use serde_json::{json, Value};
-use reqwest;
 
 // LLMクライアント構造体
 #[derive(Clone)]
@@ -49,7 +50,7 @@ impl LLMClient {
         let model = options
             .map(|opt| opt.model)
             .unwrap_or("google_ai:gemini-2.0-flash-exp");
-        
+
         let request_body = json!({
             "model": model,
             "messages": [
@@ -116,7 +117,6 @@ impl SlackEventHandler for MentionHandler {
                 let text = text.clone();
 
                 tokio::spawn(async move {
-                    
                     // モデルを指定してLLM APIから応答を取得
                     let options = Some(LLMOptions {
                         model: "google_ai:gemini-2.0-flash-exp",
@@ -130,15 +130,60 @@ impl SlackEventHandler for MentionHandler {
                             "申し訳ありません。応答の生成に失敗しました。".to_string()
                         }
                     };
-                    
+
                     if let Err(e) = client.reply_to_thread(&channel, &ts, &message).await {
                         info!("返信の送信に失敗: {}", e);
                     }
                 });
-            },
-            Event::Message { channel, text, team_id } => {
-                info!("メッセージを受信: channel={}, text={}, team_id={}", channel, text, team_id.unwrap_or_default());
-            },
+            }
+            Event::Message(Message {
+                channel,
+                text,
+                team_id,
+                sender,
+                ts,
+            }) => {
+                info!(
+                    "メッセージを受信: channel={}, text={}, team_id={}, sender={:?}, ts={}",
+                    channel,
+                    text,
+                    team_id.unwrap_or_default(),
+                    sender,
+                    ts
+                );
+
+                if let Sender::User { id, .. } = sender {
+                    if id != "U05HWFCGZ1D" {
+                        let llm_client = self.llm_client.clone();
+                        let client = client.clone();
+                        let channel = channel.clone();
+                        let ts = ts.clone();
+                        let text = text.clone();
+
+                        tokio::spawn(async move {
+                            // モデルを指定してLLM APIから応答を取得
+                            let options = Some(LLMOptions {
+                                model: "google_ai:gemini-2.0-flash-exp",
+                            });
+
+                            let result = llm_client.get_response(&text, options).await;
+                            let message = match result {
+                                Ok(response) => response,
+                                Err(e) => {
+                                    info!("LLM APIからの応答取得に失敗: {}", e);
+                                    "申し訳ありません。応答の生成に失敗しました。".to_string()
+                                }
+                            };
+
+                            if let Err(e) = client.reply_to_thread(&channel, &ts, &message).await {
+                                info!("返信の送信に失敗: {}", e);
+                            }
+                        });
+                    } else {
+                        tracing::debug!("stockmind自身のメッセージのため無視");
+                    }
+                }
+            }
             _ => info!("未対応のイベント: {:?}", event),
         }
         Ok(())

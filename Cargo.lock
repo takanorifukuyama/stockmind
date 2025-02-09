@@ -2255,7 +2255,7 @@ dependencies = [
 [[package]]
 name = "slack_rs"
 version = "0.1.0"
-source = "git+https://github.com/quantum-box/slack_rs.git?branch=main#9efd0e510576b45380f41593ab09a640cbd5ef44"
+source = "git+https://github.com/quantum-box/slack_rs.git?branch=feature%2Fmessage-event#9d53c97d151a4dc277fc9f14d63782dc7cb67340"
 dependencies = [
  "async-trait",
  "axum 0.6.20",
